@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Green Home Sustainability Analytics</title>
+    <!-- Bootstrap 5 & Google Fonts -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <style>
+        :root {
+            --bg-gradient: linear-gradient(135deg, #0f2027 0%, #203a43 50%, #2c5364 100%);
+            --card-bg: #ffffff;
+            --primary-emerald: #10b981;
+            --accent-green: #059669;
+            --dark-forest: #064e3b;
+            --light-bg: #f8fafc;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+        }
+
+        body {
+            background: #f1f5f9;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            color: var(--text-main);
+            min-height: 100vh;
+        }
+
+        /* Top Hero Navigation */
+        .navbar-custom {
+            background: var(--dark-forest);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+            padding: 0.9rem 2rem;
+        }
+
+        .navbar-brand {
+            color: #ffffff !important;
+            font-weight: 800;
+            font-size: 1.35rem;
+            letter-spacing: -0.5px;
+        }
+
+        .nav-pills .nav-link {
+            color: #a7f3d0 !important;
+            font-weight: 600;
+            border-radius: 30px;
+            padding: 8px 20px;
+            transition: all 0.3s ease;
+        }
+
+        .nav-pills .nav-link.active, .nav-pills .nav-link:hover {
+            background-color: var(--primary-emerald) !important;
+            color: #ffffff !important;
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+        }
+
+        /* Modern Dashboard Metric Cards */
+        .metric-card {
+            background: var(--card-bg);
+            border-radius: 16px;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05);
+            padding: 20px;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .metric-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 30px -5px rgba(0, 0, 0, 0.08);
+        }
+
+        .metric-icon {
+            width: 42px;
+            height: 42px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25rem;
+            margin-bottom: 12px;
+        }
+
+        .metric-value {
+            font-size: 1.8rem;
+            font-weight: 800;
+            color: var(--text-main);
+            line-height: 1.2;
+        }
+
+        .metric-label {
+            font-size: 0.78rem;
+            text-transform: uppercase;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            color: var(--text-muted);
+        }
+
+        /* Circular Eco-Score Gauge */
+        .score-circle {
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            background: conic-gradient(var(--primary-emerald) calc(var(--score) * 1%), #e2e8f0 0);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        .score-circle::before {
+            content: "";
+            position: absolute;
+            width: 54px;
+            height: 54px;
+            border-radius: 50%;
+            background: white;
+        }
+
+        .score-text {
+            position: relative;
+            font-weight: 800;
+            font-size: 1.1rem;
+            color: var(--dark-forest);
+        }
+
+        /* Form Controls & Inputs */
+        .card-panel {
+            background: #ffffff;
+            border-radius: 16px;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.03);
+            padding: 24px;
+            margin-bottom: 24px;
+        }
+
+        .form-control, .form-select {
+            border-radius: 8px;
+            border: 1px solid #cbd5e1;
+            font-size: 0.9rem;
+            padding: 8px 12px;
+        }
+
+        .form-control:focus, .form-select:focus {
+            border-color: var(--primary-emerald);
+            box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15);
+        }
+
+        .btn-green {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            font-weight: 700;
+            border: none;
+            border-radius: 10px;
+            padding: 12px 20px;
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25);
+            transition: all 0.2s ease;
+        }
+
+        .btn-green:hover {
+            background: linear-gradient(135deg, #059669 0%, #047857 100%);
+            color: white;
+            box-shadow: 0 6px 16px rgba(16, 185, 129, 0.35);
+        }
+
+        .section-view { display: none; }
+        .section-view.active { display: block; }
+    </style>
+</head>
+<body>
+
+    <!-- Header Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-custom sticky-top">
+        <div class="container-fluid">
+            <a class="navbar-brand d-flex align-items-center gap-2" href="#">
+                <i class="bi bi-leaf-fill text-warning"></i> ECO-METRICS ANALYTICS
+            </a>
+            <div class="ms-auto">
+                <ul class="nav nav-pills" id="mainTabs">
+                    <li class="nav-item">
+                        <a class="nav-link active" onclick="switchTab('dashboard', this)"><i class="bi bi-grid-1x2-fill me-1"></i> Dashboard</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" onclick="switchTab('history', this)"><i class="bi bi-clock-history me-1"></i> History Logs</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" onclick="switchTab('recommendations', this)"><i class="bi bi-lightbulb-fill me-1"></i> Smart Actions</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid px-4 my-4">
+
+        <!-- DASHBOARD VIEW -->
+        <div id="dashboard" class="section-view active">
+            
+            <!-- Summary Metric Bar -->
+            <div class="row g-3 mb-4">
+                <div class="col-xl-3 col-md-6">
+                    <div class="metric-card d-flex align-items-center justify-content-between">
+                        <div>
+                            <span class="metric-label">Est. Monthly Electricity</span>
+                            <div class="metric-value" id="val-bill">₹0.00</div>
+                            <small class="text-muted fw-bold" id="val-kwh">0 kWh / month</small>
+                        </div>
+                        <div class="metric-icon bg-success-subtle text-success">
+                            <i class="bi bi-lightning-charge-fill"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-xl-3 col-md-6">
+                    <div class="metric-card d-flex align-items-center justify-content-between">
+                        <div>
+                            <span class="metric-label">Model Accuracy</span>
+                            <div class="metric-value text-success" id="val-accuracy">0.0%</div>
+                            <small class="text-muted fw-bold"><i class="bi bi-check-circle-fill text-success me-1"></i> Calibrated</small>
+                        </div>
+                        <div class="metric-icon bg-info-subtle text-info">
+                            <i class="bi bi-sliders"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-xl-3 col-md-6">
+                    <div class="metric-card d-flex align-items-center justify-content-between">
+                        <div>
+                            <span class="metric-label">Water Footprint</span>
+                            <div class="metric-value text-primary" id="val-water">0 L</div>
+                            <small class="text-muted fw-bold">135 LPD / Person</small>
+                        </div>
+                        <div class="metric-icon bg-primary-subtle text-primary">
+                            <i class="bi bi-droplet-fill"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-xl-3 col-md-6">
+                    <div class="metric-card d-flex align-items-center justify-content-between">
+                        <div>
+                            <span class="metric-label">Eco Score</span>
+                            <div class="d-flex align-items-baseline gap-2">
+                                <div class="metric-value" id="val-ecoscore">0</div>
+                                <span class="text-muted fw-bold">/ 100</span>
+                            </div>
+                            <small class="text-muted fw-bold" id="val-co2">0 kg CO₂ / Month</small>
+                        </div>
+                        <div class="score-circle" id="eco-gauge" style="--score: 0;">
+                            <span class="score-text" id="gauge-text">0</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-4">
+                <!-- Inputs Section -->
+                <div class="col-lg-5">
+                    <div class="card-panel">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h5 class="fw-bold m-0"><i class="bi bi-cpu text-success me-2"></i>Household Appliances</h5>
+                            <button class="btn btn-sm btn-outline-success rounded-pill fw-bold" onclick="addApplianceRow()">+ Add Item</button>
+                        </div>
+
+                        <!-- Labels for Appliance Grid -->
+                        <div class="row g-2 mb-2 text-muted fw-bold small">
+                            <div class="col-5">Appliance Type</div>
+                            <div class="col-2 text-center">Qty</div>
+                            <div class="col-3 text-center">Hrs/Day</div>
+                            <div class="col-2 text-center">Remove</div>
+                        </div>
+
+                        <div id="appliance-rows"></div>
+
+                        <hr class="my-4">
+
+                        <h5 class="fw-bold mb-3"><i class="bi bi-sliders2 text-success me-2"></i>Environmental & Tariff Inputs</h5>
+                        
+                        <div class="row g-3 mb-3">
+                            <div class="col-6">
+                                <label class="form-label small fw-bold">Family Members</label>
+                                <input type="number" id="person_count" class="form-control" value="4" min="1">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small fw-bold">Daily Solid Waste (kg)</label>
+                                <input type="number" id="waste_kg" class="form-control" value="1.5" step="0.1" min="0">
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold">Electricity Tariff Rate (₹ / Unit)</label>
+                            <input type="number" id="rate_per_unit" class="form-control" value="8.50" step="0.1">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold">Fixed Base Monthly Charge (₹)</label>
+                            <input type="number" id="fixed_charge" class="form-control" value="100.00">
+                        </div>
+                        <div class="mb-4">
+                            <label class="form-label small fw-bold">Actual Recieved Bill (₹) [Validation]</label>
+                            <input type="number" id="actual_bill" class="form-control" value="2150.00">
+                        </div>
+
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-green w-100" onclick="calculateEnergy()"><i class="bi bi-calculator me-1"></i> Calculate & Recalibrate</button>
+                            <button class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#formulaModal" title="View Formulas"><i class="bi bi-info-circle-fill"></i></button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Visualizations Section -->
+                <div class="col-lg-7">
+                    <div class="card-panel mb-4">
+                        <h5 class="fw-bold mb-3"><i class="bi bi-pie-chart-fill text-success me-2"></i>Appliance Power Share</h5>
+                        <div style="position: relative; height: 260px;">
+                            <canvas id="pieChart"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="card-panel">
+                        <h5 class="fw-bold mb-3"><i class="bi bi-graph-up-arrow text-success me-2"></i>Multi-Month Consumption Trend</h5>
+                        <div style="position: relative; height: 220px;">
+                            <canvas id="lineChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- HISTORY VIEW -->
+        <div id="history" class="section-view">
+            <div class="card-panel">
+                <h4 class="fw-bold mb-3">Historical Consumption & Calibration Logs</h4>
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Month</th>
+                                <th>Daily Energy</th>
+                                <th>Monthly Energy</th>
+                                <th>Estimated Bill</th>
+                                <th>Actual Bill</th>
+                                <th>Accuracy</th>
+                                <th>Eco Score</th>
+                            </tr>
+                        </thead>
+                        <tbody id="history-table-body"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- RECOMMENDATIONS VIEW -->
+        <div id="recommendations" class="section-view">
+            <div class="card-panel">
+                <h4 class="fw-bold mb-3"><i class="bi bi-lightbulb text-warning me-2"></i>Tailored Energy & Water Conservation Plan</h4>
+                <div id="recommendations-container" class="row g-3"></div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Math & Formula Breakdown Modal -->
+    <div class="modal fade" id="formulaModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-dark text-white">
+                    <h5 class="modal-title fw-bold"><i class="bi bi-journal-code me-2"></i>Calculation Methodology</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <h6><strong>1. Electricity Tier-Slab Model</strong></h6>
+                    <p class="text-muted small">Units up to 100 kWh are calculated at 70% of base rate, 101-300 kWh at base rate, and 300+ kWh at 130% surcharge + Fixed Base Charge.</p>
+                    
+                    <h6><strong>2. Water Benchmark Model</strong></h6>
+                    <p class="text-muted small">Calculated using Bureau of Indian Standards (BIS) standard benchmark: $\text{Persons} \times 135 \text{ Liters/Day} \times 30 \text{ Days}$.</p>
+
+                    <h6><strong>3. Model Accuracy Percentage</strong></h6>
+                    <p class="text-muted small">Formula: $100\% - \left( \frac{|\text{Actual Bill} - \text{Estimated Bill}|}{\text{Actual Bill}} \times 100 \right)$.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+        let applianceList = {};
+        let pieChart, lineChart;
+
+        async function init() {
+            const res = await fetch('/api/appliances');
+            applianceList = await res.json();
+            
+            // Initial default appliances
+            addApplianceRow("Ceiling Fan (Standard - 75W)", 2, 14);
+            addApplianceRow("Refrigerator (Single Door - 100W)", 1, 24);
+            addApplianceRow("Water Heater / Geyser (2000W)", 1, 1);
+            addApplianceRow("LED Bulb (9W)", 3, 8);
+
+            calculateEnergy();
+        }
+
+        function addApplianceRow(defaultType = "", defaultQty = 1, defaultHrs = 5) {
+            const container = document.getElementById('appliance-rows');
+            const rowId = Math.floor(Math.random() * 100000);
+            
+            let optionsHTML = '';
+            for (let name in applianceList) {
+                const selected = name === defaultType ? 'selected' : '';
+                optionsHTML += `<option value="${name}" ${selected}>${name}</option>`;
+            }
+
+            const rowDIV = document.createElement('div');
+            rowDIV.className = 'row g-2 align-items-center mb-2';
+            rowDIV.id = `row-${rowId}`;
+            rowDIV.innerHTML = `
+                <div class="col-5">
+                    <select class="form-select form-select-sm app-type" onchange="toggleCustomInput(this, '${rowId}')">
+                        ${optionsHTML}
+                    </select>
+                    <input type="text" class="form-control form-control-sm mt-1 d-none custom-name" placeholder="Name" id="cname-${rowId}">
+                </div>
+                <div class="col-2">
+                    <input type="number" class="form-control form-control-sm text-center app-qty" value="${defaultQty}" min="1">
+                </div>
+                <div class="col-3">
+                    <input type="number" class="form-control form-control-sm text-center app-hrs" value="${defaultHrs}" min="0" max="24">
+                </div>
+                <div class="col-2 text-center">
+                    <button class="btn btn-sm btn-outline-danger border-0" onclick="removeRow('row-${rowId}')"><i class="bi bi-trash-fill"></i></button>
+                </div>
+                <div class="col-12 d-none custom-watt-container" id="cwatt-box-${rowId}">
+                    <input type="number" class="form-control form-control-sm mt-1 custom-watt" placeholder="Enter Wattage (W)" id="cwatt-${rowId}">
+                </div>
+            `;
+            container.appendChild(rowDIV);
+        }
+
+        function toggleCustomInput(selectElem, rowId) {
+            const customNameInput = document.getElementById(`cname-${rowId}`);
+            const customWattBox = document.getElementById(`cwatt-box-${rowId}`);
+            if (selectElem.value === "Custom Appliance") {
+                customNameInput.classList.remove('d-none');
+                customWattBox.classList.remove('d-none');
+            } else {
+                customNameInput.classList.add('d-none');
+                customWattBox.classList.add('d-none');
+            }
+        }
+
+        function removeRow(id) {
+            document.getElementById(id).remove();
+        }
+
+        function switchTab(tabId, elem) {
+            document.querySelectorAll('.section-view').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.nav-link').forEach(el => el.classList.remove('active'));
+            
+            document.getElementById(tabId).classList.add('active');
+            elem.classList.add('active');
+
+            if (tabId === 'history') loadHistory();
+        }
+
+        async function calculateEnergy() {
+            const rows = document.querySelectorAll('#appliance-rows .row');
+            const appliances = [];
+
+            rows.forEach(r => {
+                const type = r.querySelector('.app-type').value;
+                const qty = r.querySelector('.app-qty').value;
+                const hrs = r.querySelector('.app-hrs').value;
+                const customNameInput = r.querySelector('.custom-name');
+                const customWattInput = r.querySelector('.custom-watt');
+
+                appliances.push({
+                    type: type,
+                    qty: qty,
+                    hrs: hrs,
+                    custom_name: customNameInput ? customNameInput.value : '',
+                    custom_wattage: customWattInput ? customWattInput.value : ''
+                });
+            });
+
+            const payload = {
+                appliances: appliances,
+                rate_per_unit: document.getElementById('rate_per_unit').value,
+                fixed_charge: document.getElementById('fixed_charge').value,
+                actual_bill: document.getElementById('actual_bill').value,
+                person_count: document.getElementById('person_count').value,
+                waste_kg: document.getElementById('waste_kg').value,
+                month_label: "Aug 2026"
+            };
+
+            const res = await fetch('/api/calculate', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(payload)
+            });
+
+            const data = await res.json();
+            
+            // Update Dashboard Metrics
+            document.getElementById('val-bill').innerText = `₹${data.estimated_bill.toLocaleString()}`;
+            document.getElementById('val-kwh').innerText = `${data.monthly_kwh} kWh / month`;
+            document.getElementById('val-accuracy').innerText = `${data.accuracy_pct}%`;
+            document.getElementById('val-water').innerText = `${data.monthly_water_liters.toLocaleString()} L`;
+            document.getElementById('val-ecoscore').innerText = data.eco_score;
+            document.getElementById('val-co2').innerText = `${data.monthly_co2_kg} kg CO₂ / Month`;
+
+            // Update Eco Gauge Circle
+            const gauge = document.getElementById('eco-gauge');
+            gauge.style.setProperty('--score', data.eco_score);
+            document.getElementById('gauge-text').innerText = data.eco_score;
+
+            updatePieChart(data.appliance_breakdown);
+            renderRecommendations(data.suggestions);
+            loadHistory();
+        }
+
+        function updatePieChart(breakdown) {
+            const labels = Object.keys(breakdown);
+            const values = Object.values(breakdown);
+
+            if (pieChart) pieChart.destroy();
+
+            const ctx = document.getElementById('pieChart').getContext('2d');
+            pieChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: values,
+                        backgroundColor: ['#10b981', '#059669', '#047857', '#34d399', '#6ee7b7', '#a7f3d0', '#065f46']
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+        }
+
+        async function loadHistory() {
+            const res = await fetch('/api/history');
+            const data = await res.json();
+
+            const tbody = document.getElementById('history-table-body');
+            tbody.innerHTML = '';
+
+            const monthLabels = [];
+            const kwhValues = [];
+
+            data.forEach(log => {
+                monthLabels.push(log.month_name);
+                kwhValues.push(log.monthly_kwh);
+
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><strong>${log.month_name}</strong></td>
+                    <td>${log.daily_kwh} kWh</td>
+                    <td>${log.monthly_kwh} kWh</td>
+                    <td>₹${log.estimated_bill}</td>
+                    <td>₹${log.actual_bill}</td>
+                    <td><span class="badge bg-success-subtle text-success border border-success">${log.accuracy_pct}%</span></td>
+                    <td><span class="badge bg-emerald text-white" style="background:#10b981">${log.eco_score}</span></td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            renderLineChart(monthLabels, kwhValues);
+        }
+
+        function renderLineChart(labels, data) {
+            if (lineChart) lineChart.destroy();
+            const ctx = document.getElementById('lineChart').getContext('2d');
+            lineChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Monthly Energy Consumption (kWh)',
+                        data: data,
+                        borderColor: '#10b981',
+                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                        fill: true,
+                        tension: 0.3
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+        }
+
+        function renderRecommendations(recs) {
+            const container = document.getElementById('recommendations-container');
+            container.innerHTML = '';
+            recs.forEach(r => {
+                const col = document.createElement('div');
+                col.className = 'col-md-6';
+                col.innerHTML = `
+                    <div class="card h-100 border-0 shadow-sm rounded-4 p-3" style="background:#f8fafc; border-left: 5px solid #10b981 !important;">
+                        <div class="card-body">
+                            <span class="badge bg-success-subtle text-success mb-2 fw-bold">${r.category}</span>
+                            <h6 class="fw-bold text-dark">${r.title}</h6>
+                            <p class="text-muted small m-0">${r.desc}</p>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(col);
+            });
+        }
+
+        window.onload = init;
+    </script>
+</body>
+</html>
