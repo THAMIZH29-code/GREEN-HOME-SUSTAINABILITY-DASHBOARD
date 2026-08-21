@@ -1,199 +1,165 @@
+import os
 from flask import Flask, render_template, request, jsonify
-from flask_cors import CORS
-from models import db, ConsumptionLog, APPLIANCE_WATTAGE
-from datetime import datetime
+from models import db, ConsumptionLog
 
 app = Flask(__name__)
-CORS(app)
 
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///sustainability.db'
+# Absolute database path setup
+BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+INSTANCE_DIR = os.path.join(BASE_DIR, 'instance')
+
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(INSTANCE_DIR, 'database.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db.init_app(app)
 
-def calculate_slab_cost(units, base_rate):
-    """Calculates realistic tier-based electricity tariff cost."""
-    if units <= 100:
-        return units * (base_rate * 0.7)
-    elif units <= 300:
-        return (100 * (base_rate * 0.7)) + ((units - 100) * base_rate)
-    else:
-        return (100 * (base_rate * 0.7)) + (200 * base_rate) + ((units - 300) * (base_rate * 1.3))
+# Default appliance wattages dictionary
+APPLIANCE_DATA = {
+    "Ceiling Fan (Standard - 75W)": 75,
+    "Refrigerator (Single Door - 100W)": 100,
+    "Refrigerator (Double Door - 250W)": 250,
+    "Air Conditioner 1.5 Ton (Inverter - 1500W)": 1500,
+    "Air Conditioner 1.5 Ton (Non-Inverter - 1800W)": 1800,
+    "LED Bulb (9W)": 9,
+    "Tube Light (20W)": 20,
+    "Television (43-inch LED - 75W)": 75,
+    "Washing Machine (650W)": 650,
+    "Water Heater / Geyser (2000W)": 2000,
+    "Microwave Oven (1200W)": 1200,
+    "Water Pump / Submersible (750W)": 750,
+    "Laptop (65W)": 65,
+    "Desktop Computer (200W)": 200,
+    "Custom Appliance": 0
+}
 
-def generate_sustainability_recommendations(breakdown, daily_kwh, water_liters, waste_kg):
-    recs = []
-    
-    # Check High Wattage Heating/Cooling Loads
-    ac_kwh = sum(v for k, v in breakdown.items() if "Air Conditioner" in k)
-    if ac_kwh > 100:
-        recs.append({
-            "category": "Energy Efficiency",
-            "title": "Optimize Thermostat Settings",
-            "desc": f"Air conditioning accounts for ~{round(ac_kwh, 1)} kWh/month. Setting the thermostat between 24°C–26°C reduces cooling load by up to 18%."
-        })
-        
-    water_heater_kwh = sum(v for k, v in breakdown.items() if "Water Heater" in k or "Geyser" in k)
-    if water_heater_kwh > 50:
-        recs.append({
-            "category": "Thermal Load",
-            "title": "Geyser Duty Cycle Optimization",
-            "desc": "Water heaters draw high peak wattage (2000W). Switch off units after 15-20 minutes of heating rather than leaving them continuously powered."
-        })
-
-    # Check Lighting/Fan Efficiency
-    legacy_load = sum(v for k, v in breakdown.items() if "Standard" in k or "Fluorescent" in k)
-    if legacy_load > 0:
-        recs.append({
-            "category": "Hardware Upgrade",
-            "title": "Migrate to BLDC & LED Standards",
-            "desc": "Replacing traditional ceiling fans (75W) with BLDC fans (28W) and standard tubes with LEDs cuts lighting/fan power draw by 60%."
-        })
-
-    # Water Footprint Evaluation
-    if water_liters > 12000:
-        recs.append({
-            "category": "Water Conservation",
-            "title": "Low-Flow Tap Aerators",
-            "desc": "Monthly household water demand is above baseline benchmark. Installing sink aerators reduces tap water flow rate without altering usability."
-        })
-
-    # Waste Management Evaluation
-    if waste_kg > 2.0:
-        recs.append({
-            "category": "Waste Management",
-            "title": "Segregation & Organic Composting",
-            "desc": "Daily solid waste generation is above 2.0 kg. Segregating organic wet waste for home composting reduces municipal landfill methane impact."
-        })
-
-    if not recs:
-        recs.append({
-            "category": "Sustainability Status",
-            "title": "Optimized Resource Profile",
-            "desc": "Your baseline electricity, water, and waste footprints are well within sustainable residential benchmarks."
-        })
-        
-    return recs
+# Auto-create missing database tables
+with app.app_context():
+    os.makedirs(INSTANCE_DIR, exist_ok=True)
+    db.create_all()
 
 @app.route('/')
-def home():
+def index():
     return render_template('index.html')
 
+# MISSING ENDPOINT FIXED HERE
 @app.route('/api/appliances', methods=['GET'])
 def get_appliances():
-    return jsonify(APPLIANCE_WATTAGE)
+    return jsonify(APPLIANCE_DATA)
 
 @app.route('/api/calculate', methods=['POST'])
 def calculate():
-    data = request.get_json(force=True) or {}
-    
-    appliances = data.get('appliances', [])
-    rate_per_unit = float(data.get('rate_per_unit', 8.5))
-    fixed_charge = float(data.get('fixed_charge', 100.0))
-    actual_bill = float(data.get('actual_bill', 0.0))
-    person_count = int(data.get('person_count', 4))
-    waste_kg = float(data.get('waste_kg', 1.5))
-    month_label = data.get('month_label', datetime.now().strftime('%b %Y'))
+    try:
+        data = request.get_json(silent=True) or {}
 
-    daily_kwh = 0.0
-    appliance_kwh_breakdown = {}
+        appliances = data.get('appliances', [])
+        rate_per_unit = float(data.get('rate_per_unit', 8.5))
+        fixed_charge = float(data.get('fixed_charge', 100))
+        actual_bill = float(data.get('actual_bill', 2150))
+        person_count = int(data.get('person_count', 4))
+        waste_kg = float(data.get('waste_kg', 1.5))
+        month_label = data.get('month_label', 'Aug 2026')
 
-    for item in appliances:
-        app_type = item.get('type', '')
-        qty = float(item.get('qty', 0))
-        hrs = float(item.get('hrs', 0))
-        
-        # Support user manual entry for wattage & custom name
-        if app_type == "Custom Appliance":
-            wattage = float(item.get('custom_wattage', 100))
-            display_name = item.get('custom_name', 'Custom Appliance')
-            if not display_name.strip():
-                display_name = "Custom Appliance"
+        # 1. Calculate Appliance Energy Breakdown
+        total_daily_kwh = 0.0
+        breakdown = {}
+
+        for app_item in appliances:
+            app_type = app_item.get('type')
+            qty = float(app_item.get('qty', 1))
+            hrs = float(app_item.get('hrs', 0))
+
+            if app_type == "Custom Appliance":
+                wattage = float(app_item.get('custom_wattage', 0))
+                label_name = app_item.get('custom_name', 'Custom Item') or 'Custom Item'
+            else:
+                wattage = APPLIANCE_DATA.get(app_type, 0)
+                label_name = app_type.split(' (')[0] if '(' in app_type else app_type
+
+            daily_kwh_item = (wattage * qty * hrs) / 1000.0
+            total_daily_kwh += daily_kwh_item
+            
+            monthly_item_kwh = round(daily_kwh_item * 30, 2)
+            breakdown[label_name] = breakdown.get(label_name, 0) + monthly_item_kwh
+
+        monthly_kwh = round(total_daily_kwh * 30, 2)
+
+        # 2. Slab Tariff Electricity Bill Calculation
+        if monthly_kwh <= 100:
+            energy_charge = monthly_kwh * (rate_per_unit * 0.7)
+        elif monthly_kwh <= 300:
+            energy_charge = (100 * rate_per_unit * 0.7) + ((monthly_kwh - 100) * rate_per_unit)
         else:
-            wattage = APPLIANCE_WATTAGE.get(app_type, 0)
-            display_name = app_type
+            energy_charge = (100 * rate_per_unit * 0.7) + (200 * rate_per_unit) + ((monthly_kwh - 300) * rate_per_unit * 1.3)
 
-        item_daily_kwh = (wattage * qty * hrs) / 1000.0
-        daily_kwh += item_daily_kwh
-        
-        monthly_app_kwh = round(item_daily_kwh * 30, 2)
-        appliance_kwh_breakdown[display_name] = appliance_kwh_breakdown.get(display_name, 0) + monthly_app_kwh
+        estimated_bill = round(energy_charge + fixed_charge, 2)
 
-    monthly_kwh = daily_kwh * 30
-    energy_cost = calculate_slab_cost(monthly_kwh, rate_per_unit)
-    estimated_bill = energy_cost + fixed_charge
+        # 3. Model Accuracy Percentage
+        if actual_bill > 0:
+            error = abs(actual_bill - estimated_bill)
+            accuracy_pct = max(0.0, round(100.0 - ((error / actual_bill) * 100.0), 1))
+        else:
+            accuracy_pct = 100.0
 
-    # Model Accuracy Percent Calculation
-    accuracy_pct = 0.0
-    if actual_bill > 0:
-        diff = abs(actual_bill - estimated_bill)
-        accuracy_pct = max(0.0, 100.0 - ((diff / actual_bill) * 100.0))
+        # 4. Environmental Footprint Calculations
+        monthly_water_liters = person_count * 135 * 30  # BIS Standard: 135 LPD
+        monthly_co2_kg = round(monthly_kwh * 0.82, 2)  # Emission factor: 0.82 kg/kWh
 
-    # Water Footprint: 135 LPD benchmark per capita
-    monthly_water_liters = person_count * 135 * 30
-    
-    # Environmental CO2 Footprint Calculation
-    monthly_co2 = (monthly_kwh * 0.85) + (monthly_water_liters * 0.001) + (waste_kg * 30 * 1.2)
+        # 5. Eco Score Formula (100 Base)
+        score = 100
+        if monthly_kwh > (person_count * 75): score -= 15
+        if monthly_kwh > (person_count * 120): score -= 20
+        if waste_kg > (person_count * 0.5): score -= 10
+        eco_score = max(10, score)
 
-    # Eco-Score Algorithm (Base 100)
-    eco_score = 100
-    if daily_kwh > 15:
-        eco_score -= min(35, int((daily_kwh - 15) * 2))
-    if (person_count * 135) > 500:
-        eco_score -= min(25, int(((person_count * 135) - 500) * 0.05))
-    if waste_kg > 2.0:
-        eco_score -= min(20, int((waste_kg - 2.0) * 10))
-    eco_score = max(10, eco_score)
-
-    # Dynamic Recommendation Engine
-    suggestions = generate_sustainability_recommendations(appliance_kwh_breakdown, daily_kwh, monthly_water_liters, waste_kg)
-
-    # Persist log entry to database
-    log = ConsumptionLog(
-        month_name=month_label,
-        daily_kwh=round(daily_kwh, 2),
-        monthly_kwh=round(monthly_kwh, 2),
-        estimated_bill=round(estimated_bill, 2),
-        actual_bill=round(actual_bill, 2),
-        accuracy_pct=round(accuracy_pct, 1),
-        monthly_water_liters=round(monthly_water_liters, 0),
-        daily_waste_kg=waste_kg,
-        monthly_co2_kg=round(monthly_co2, 2),
-        eco_score=eco_score
-    )
-    db.session.add(log)
-    db.session.commit()
-
-    return jsonify({
-        "status": "success",
-        "monthly_kwh": round(monthly_kwh, 2),
-        "estimated_bill": round(estimated_bill, 2),
-        "actual_bill": round(actual_bill, 2),
-        "accuracy_pct": round(accuracy_pct, 1),
-        "monthly_water_liters": round(monthly_water_liters, 0),
-        "daily_waste_kg": waste_kg,
-        "monthly_co2_kg": round(monthly_co2, 2),
-        "eco_score": eco_score,
-        "appliance_breakdown": appliance_kwh_breakdown,
-        "suggestions": suggestions
-    })
-
-@app.route('/api/history', methods=['GET'])
-def history():
-    logs = ConsumptionLog.query.order_by(ConsumptionLog.id.asc()).all()
-    return jsonify([l.to_dict() for l in logs])
-
-def seed_sample_data():
-    if ConsumptionLog.query.count() == 0:
-        samples = [
-            ConsumptionLog(month_name="May 2026", daily_kwh=18.5, monthly_kwh=555, estimated_bill=4817, actual_bill=4950, accuracy_pct=97.3, monthly_water_liters=16200, daily_waste_kg=1.8, monthly_co2_kg=512.5, eco_score=82),
-            ConsumptionLog(month_name="Jun 2026", daily_kwh=16.2, monthly_kwh=486, estimated_bill=4231, actual_bill=4300, accuracy_pct=98.4, monthly_water_liters=16200, daily_waste_kg=1.5, monthly_co2_kg=455.1, eco_score=88),
-            ConsumptionLog(month_name="Jul 2026", daily_kwh=14.0, monthly_kwh=420, estimated_bill=3620, actual_bill=3500, accuracy_pct=96.6, monthly_water_liters=16200, daily_waste_kg=1.4, monthly_co2_kg=398.2, eco_score=91)
+        # 6. Generate Dynamic Recommendations
+        suggestions = [
+            {
+                "category": "Energy Saving",
+                "title": "Optimize High-Power Appliances",
+                "desc": f"Your current usage totals {monthly_kwh} kWh/month. Shifting heavy loads away from peak hours can lower surcharges."
+            },
+            {
+                "category": "Water Management",
+                "title": "Water Consumption Tracking",
+                "desc": f"Estimated water consumption is {monthly_water_liters:,} Liters/month for {person_count} members."
+            }
         ]
-        db.session.bulk_save_objects(samples)
+
+        # 7. Save Log to Database
+        log_entry = ConsumptionLog(
+            month_name=month_label,
+            daily_kwh=round(total_daily_kwh, 2),
+            monthly_kwh=monthly_kwh,
+            estimated_bill=estimated_bill,
+            actual_bill=actual_bill,
+            accuracy_pct=accuracy_pct,
+            monthly_water_liters=monthly_water_liters,
+            daily_waste_kg=waste_kg,
+            monthly_co2_kg=monthly_co2_kg,
+            eco_score=eco_score
+        )
+        db.session.add(log_entry)
         db.session.commit()
 
+        return jsonify({
+            "estimated_bill": estimated_bill,
+            "monthly_kwh": monthly_kwh,
+            "accuracy_pct": accuracy_pct,
+            "monthly_water_liters": monthly_water_liters,
+            "monthly_co2_kg": monthly_co2_kg,
+            "eco_score": eco_score,
+            "appliance_breakdown": breakdown,
+            "suggestions": suggestions
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/history', methods=['GET'])
+def get_history():
+    logs = ConsumptionLog.query.order_by(ConsumptionLog.id.desc()).all()
+    return jsonify([log.to_dict() for log in logs])
+
 if __name__ == '__main__':
-    with app.app_context():
-        db.create_all()
-        seed_sample_data()
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(debug=True)
