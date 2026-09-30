@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Green Home - Sustainability Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body class="bg-slate-100 text-slate-800 font-sans min-h-screen">
+
+    <!-- Navbar -->
+    <nav class="bg-emerald-700 text-white shadow-md sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
+            <div class="flex items-center space-x-3">
+                <i class="fa-solid fa-leaf text-2xl text-emerald-300"></i>
+                <h1 class="text-xl font-bold">Green Home Analytics</h1>
+            </div>
+            <span class="bg-emerald-800 text-emerald-200 text-xs px-3 py-1 rounded-full border border-emerald-600">Software-First Prototype</span>
+        </div>
+    </nav>
+
+    <main class="max-w-7xl mx-auto px-4 py-6 space-y-6">
+
+        <!-- Top Summary Metrics Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex justify-between items-center">
+                <div>
+                    <p class="text-xs font-semibold uppercase text-slate-400">Est. Electricity Bill</p>
+                    <h3 class="text-2xl font-bold text-slate-800" id="card-bill">₹0.00</h3>
+                    <p class="text-xs text-slate-500 mt-1" id="card-kwh">0 kWh / month</p>
+                </div>
+                <div class="p-3 bg-emerald-100 text-emerald-600 rounded-lg"><i class="fa-solid fa-bolt text-xl"></i></div>
+            </div>
+
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex justify-between items-center">
+                <div>
+                    <p class="text-xs font-semibold uppercase text-slate-400">Model Accuracy</p>
+                    <h3 class="text-2xl font-bold text-emerald-600" id="card-accuracy">100%</h3>
+                    <p class="text-xs text-emerald-600 font-medium mt-1"><i class="fa-solid fa-circle-check"></i> Calibrated</p>
+                </div>
+                <div class="p-3 bg-blue-100 text-blue-600 rounded-lg"><i class="fa-solid fa-sliders text-xl"></i></div>
+            </div>
+
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex justify-between items-center">
+                <div>
+                    <p class="text-xs font-semibold uppercase text-slate-400">Water Footprint</p>
+                    <h3 class="text-2xl font-bold text-slate-800" id="card-water">0 L</h3>
+                    <p class="text-xs text-slate-500 mt-1">BIS Benchmark (135 LPD)</p>
+                </div>
+                <div class="p-3 bg-cyan-100 text-cyan-600 rounded-lg"><i class="fa-solid fa-droplet text-xl"></i></div>
+            </div>
+
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex justify-between items-center cursor-pointer hover:border-emerald-400 transition" onclick="toggleScoreModal()">
+                <div>
+                    <p class="text-xs font-semibold uppercase text-slate-400">Sustainability Score</p>
+                    <h3 class="text-2xl font-bold text-emerald-600" id="card-score">0 / 100</h3>
+                    <p class="text-xs text-slate-500 mt-1" id="card-co2">0 kg CO₂ / Month</p>
+                </div>
+                <div class="p-3 bg-emerald-100 text-emerald-600 rounded-lg"><i class="fa-solid fa-award text-xl"></i></div>
+            </div>
+        </div>
+
+        <!-- TAB NAVIGATION HEADERS -->
+        <div class="flex border-b border-slate-300 bg-white rounded-t-xl px-4 pt-2 gap-2 overflow-x-auto">
+            <button onclick="switchTab('tab-calculator')" id="btn-tab-calculator" class="tab-btn active-tab border-b-2 border-emerald-600 text-emerald-700 font-bold px-4 py-2.5 text-sm flex items-center gap-2">
+                <i class="fa-solid fa-calculator"></i> Household Calculator
+            </button>
+            <button onclick="switchTab('tab-analytics')" id="btn-tab-analytics" class="tab-btn text-slate-500 hover:text-slate-700 font-medium px-4 py-2.5 text-sm flex items-center gap-2">
+                <i class="fa-solid fa-chart-pie"></i> Analytics & Recommendations
+            </button>
+            <button onclick="switchTab('tab-simulator')" id="btn-tab-simulator" class="tab-btn text-slate-500 hover:text-slate-700 font-medium px-4 py-2.5 text-sm flex items-center gap-2">
+                <i class="fa-solid fa-sliders"></i> Top-3 What-If Simulator
+            </button>
+            <button onclick="switchTab('tab-history')" id="btn-tab-history" class="tab-btn text-slate-500 hover:text-slate-700 font-medium px-4 py-2.5 text-sm flex items-center gap-2">
+                <i class="fa-solid fa-clock-rotate-left"></i> History & Logs
+            </button>
+        </div>
+
+        <!-- TAB 1: CALCULATOR -->
+        <div id="tab-calculator" class="tab-content bg-white p-6 rounded-b-xl shadow-sm border border-slate-200 space-y-6">
+            <div class="flex justify-between items-center border-b pb-3">
+                <div>
+                    <h2 class="text-lg font-bold text-slate-800">Appliances & Household Inputs</h2>
+                    <p class="text-xs text-slate-500">Configure your daily electrical appliances and monthly utility details.</p>
+                </div>
+                <div class="flex gap-2">
+                    <button type="button" onclick="load2BHKPreset()" class="text-xs bg-slate-100 text-slate-700 px-3 py-2 rounded-lg font-semibold hover:bg-slate-200 border border-slate-300 transition">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i> Load 2BHK Preset
+                    </button>
+                    <button type="button" onclick="addApplianceRow()" class="text-xs bg-emerald-50 text-emerald-700 px-3 py-2 rounded-lg font-semibold hover:bg-emerald-100 border border-emerald-200 transition">
+                        + Add Appliance
+                    </button>
+                </div>
+            </div>
+
+            <div id="appliance-list" class="space-y-3 max-h-96 overflow-y-auto pr-2">
+                <!-- Dynamic Appliance Rows Injected via JS -->
+            </div>
+
+            <hr class="border-slate-200">
+
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div>
+                    <label class="text-xs font-semibold text-slate-600">Family Members</label>
+                    <input type="number" id="person_count" value="4" class="w-full mt-1 p-2 text-sm border rounded-lg outline-none focus:ring-2 focus:ring-emerald-500">
+                </div>
+                <div>
+                    <label class="text-xs font-semibold text-slate-600">Daily Solid Waste (kg)</label>
+                    <input type="number" step="0.1" id="waste_kg" value="1.5" class="w-full mt-1 p-2 text-sm border rounded-lg outline-none focus:ring-2 focus:ring-emerald-500">
+                </div>
+                <div>
+                    <label class="text-xs font-semibold text-slate-600">Tariff Rate (₹/kWh)</label>
+                    <input type="number" step="0.1" id="rate_per_unit" value="8.5" class="w-full mt-1 p-2 text-sm border rounded-lg outline-none focus:ring-2 focus:ring-emerald-500">
+                </div>
+                <div>
+                    <label class="text-xs font-semibold text-slate-600">Actual Electricity Bill (₹)</label>
+                    <input type="number" id="actual_bill" value="2150" class="w-full mt-1 p-2 text-sm border rounded-lg outline-none focus:ring-2 focus:ring-emerald-500">
+                </div>
+            </div>
+
+            <button type="button" onclick="calculateDashboard()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-lg shadow-md transition flex items-center justify-center gap-2 text-base">
+                <i class="fa-solid fa-calculator"></i> Run Sustainability Calculation
+            </button>
+        </div>
+
+        <!-- TAB 2: ANALYTICS & RECOMMENDATIONS -->
+        <div id="tab-analytics" class="tab-content hidden space-y-6">
+            <div class="grid grid-cols-1 md:grid-cols-12 gap-6">
+                <!-- Donut Chart -->
+                <div class="md:col-span-5 bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                    <h2 class="text-md font-bold text-slate-800 mb-2">Appliance Power Distribution</h2>
+                    <p class="text-xs text-slate-500 mb-4">Breakdown of calculated monthly kWh per appliance.</p>
+                    <div class="h-64 flex justify-center">
+                        <canvas id="pieChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Structured Recommendations -->
+                <div class="md:col-span-7 bg-white p-6 rounded-xl shadow-sm border border-slate-200 space-y-4">
+                    <div class="flex justify-between items-center border-b pb-2">
+                        <h2 class="text-md font-bold text-slate-800">Smart Data-Driven Recommendations</h2>
+                        <span class="text-xs bg-emerald-100 text-emerald-800 px-2 py-1 rounded-md font-semibold">Live Analytics</span>
+                    </div>
+                    <div id="recommendations-container" class="space-y-3">
+                        <p class="text-sm text-slate-500 italic">Run calculation on Tab 1 to generate personalized recommendations.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 3: TOP-3 WHAT-IF SIMULATOR -->
+        <div id="tab-simulator" class="tab-content hidden bg-slate-900 text-white p-6 rounded-xl shadow-lg space-y-6">
+            <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+                <div>
+                    <h2 class="text-lg font-bold text-emerald-400 flex items-center gap-2"><i class="fa-solid fa-sliders"></i> Top-3 High-Impact Load Simulator</h2>
+                    <p class="text-xs text-slate-300 mt-1">Focus exclusively on your highest energy consumers for maximum cost savings.</p>
+                </div>
+                <span class="text-xs bg-slate-800 text-emerald-300 border border-slate-700 px-3 py-1 rounded-md">Focused What-If Engine</span>
+            </div>
+
+            <div id="simulator-controls" class="space-y-4">
+                <p class="text-sm text-slate-400 italic">Please run the calculator in Tab 1 to populate your top 3 appliances.</p>
+            </div>
+
+            <div id="simulator-results" class="hidden bg-slate-800 p-5 rounded-xl border border-slate-700 grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
+                <div class="p-3 bg-slate-900/50 rounded-lg">
+                    <span class="text-xs text-slate-400 uppercase font-semibold">Monthly Energy Saved</span>
+                    <p class="text-2xl font-bold text-emerald-400 mt-1" id="sim-kwh-saved">0 kWh</p>
+                </div>
+                <div class="p-3 bg-slate-900/50 rounded-lg">
+                    <span class="text-xs text-slate-400 uppercase font-semibold">Monthly Cost Savings</span>
+                    <p class="text-2xl font-bold text-emerald-400 mt-1" id="sim-cost-saved">₹0.00</p>
+                </div>
+                <div class="p-3 bg-slate-900/50 rounded-lg">
+                    <span class="text-xs text-slate-400 uppercase font-semibold">CO₂ Avoided</span>
+                    <p class="text-2xl font-bold text-emerald-400 mt-1" id="sim-co2-saved">0 kg</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 4: HISTORY & TRENDS -->
+        <div id="tab-history" class="tab-content hidden space-y-6">
+            <!-- Line Chart -->
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                <h2 class="text-md font-bold text-slate-800 mb-2">Consumption Trend Across Runs</h2>
+                <div class="h-64">
+                    <canvas id="lineChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Historical Data Log Table -->
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 space-y-4">
+                <div class="flex justify-between items-center border-b pb-3">
+                    <h2 class="text-md font-bold text-slate-800">Historical Log Records</h2>
+                    <button onclick="exportHistoryCSV()" class="text-xs bg-slate-100 text-slate-700 px-3 py-1.5 rounded-md font-semibold border hover:bg-slate-200">
+                        <i class="fa-solid fa-download"></i> Export CSV
+                    </button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs text-slate-600">
+                        <thead class="bg-slate-50 uppercase text-slate-400 font-bold border-b">
+                            <tr>
+                                <th class="p-2">Timestamp</th>
+                                <th class="p-2">Monthly kWh</th>
+                                <th class="p-2">Est. Bill (₹)</th>
+                                <th class="p-2">Accuracy</th>
+                                <th class="p-2">Water (L)</th>
+                                <th class="p-2">CO₂ (kg)</th>
+                                <th class="p-2">Eco Score</th>
+                                <th class="p-2 text-right">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="history-table-body" class="divide-y">
+                            <!-- Rows injected via JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Score Breakdown Modal -->
+    <div id="scoreModal" class="hidden fixed inset-0 bg-slate-900 bg-opacity-60 flex items-center justify-center z-50">
+        <div class="bg-white p-6 rounded-xl max-w-md w-full space-y-4 shadow-2xl">
+            <div class="flex justify-between items-center border-b pb-2">
+                <h3 class="text-base font-bold text-slate-800">Sustainability Score Calculation Matrix</h3>
+                <button onclick="toggleScoreModal()" class="text-slate-400 hover:text-slate-600 text-lg">&times;</button>
+            </div>
+            <div class="space-y-3 text-xs">
+                <div class="flex justify-between p-2 bg-slate-50 rounded">
+                    <span>Energy Consumption Score (40% Weight):</span>
+                    <strong id="modal-energy-score" class="text-emerald-600 font-bold">0 / 100</strong>
+                </div>
+                <div class="flex justify-between p-2 bg-slate-50 rounded">
+                    <span>Water Benchmark Score (25% Weight):</span>
+                    <strong id="modal-water-score" class="text-emerald-600 font-bold">0 / 100</strong>
+                </div>
+                <div class="flex justify-between p-2 bg-slate-50 rounded">
+                    <span>Waste Management Score (20% Weight):</span>
+                    <strong id="modal-waste-score" class="text-emerald-600 font-bold">0 / 100</strong>
+                </div>
+                <div class="flex justify-between p-2 bg-slate-50 rounded">
+                    <span>Model Calibration Score (15% Weight):</span>
+                    <strong id="modal-accuracy-score" class="text-emerald-600 font-bold">0 / 100</strong>
+                </div>
+            </div>
+            <button onclick="toggleScoreModal()" class="w-full bg-slate-800 text-white py-2 rounded-lg text-xs font-bold">Close Matrix</button>
+        </div>
+    </div>
+
+    <script>
+        let applianceList = {};
+        let pieChart, lineChart;
+        let top3AppliancesData = [];
+        let historyGlobal = [];
+
+        window.addEventListener('DOMContentLoaded', async () => {
+            const res = await fetch('/api/appliances');
+            applianceList = await res.json();
+            
+            load2BHKPreset();
+            initCharts();
+            fetchHistory();
+        });
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('border-b-2', 'border-emerald-600', 'text-emerald-700', 'font-bold');
+                btn.classList.add('text-slate-500');
+            });
+
+            document.getElementById(tabId).classList.remove('hidden');
+            const activeBtn = document.getElementById(`btn-${tabId}`);
+            activeBtn.classList.add('border-b-2', 'border-emerald-600', 'text-emerald-700', 'font-bold');
+            activeBtn.classList.remove('text-slate-500');
+        }
+
+        function load2BHKPreset() {
+            const container = document.getElementById('appliance-list');
+            container.innerHTML = '';
+            addApplianceRow("Air Conditioner 1.5 Ton (Inverter - 1500W)", 1, 6);
+            addApplianceRow("Ceiling Fan (Standard - 75W)", 4, 12);
+            addApplianceRow("Refrigerator (Single Door - 100W)", 1, 24);
+            addApplianceRow("Water Heater / Geyser (2000W)", 1, 1);
+            addApplianceRow("Television (43-inch LED - 75W)", 1, 4);
+        }
+
+        function addApplianceRow(defaultType = "", defaultQty = 1, defaultHrs = 5) {
+            const container = document.getElementById('appliance-list');
+            const rowId = Date.now() + Math.random();
+            
+            let optionsHtml = '';
+            for (let name in applianceList) {
+                const selected = name === defaultType ? 'selected' : '';
+                optionsHtml += `<option value="${name}" ${selected}>${name}</option>`;
+            }
+
+            const rowHtml = `
+                <div class="flex items-center gap-2 border-b border-slate-100 pb-2" id="row-${rowId}">
+                    <select class="flex-1 p-2 text-xs border rounded-lg outline-none focus:ring-1 focus:ring-emerald-500 app-type">
+                        ${optionsHtml}
+                    </select>
+                    <input type="number" min="1" value="${defaultQty}" class="w-16 p-2 text-xs border rounded-lg app-qty" placeholder="Qty">
+                    <input type="number" min="0" max="24" step="0.5" value="${defaultHrs}" class="w-20 p-2 text-xs border rounded-lg app-hrs" placeholder="Hrs/Day">
+                    <button onclick="removeRow('row-${rowId}')" class="text-rose-500 hover:text-rose-700 p-1"><i class="fa-solid fa-trash"></i></button>
+                </div>
+            `;
+            container.insertAdjacentHTML('beforeend', rowHtml);
+        }
+
+        function removeRow(id) {
+            document.getElementById(id)?.remove();
+        }
+
+        async function calculateDashboard() {
+            const rows = document.querySelectorAll('#appliance-list > div');
+            const appliances = [];
+
+            rows.forEach(row => {
+                appliances.push({
+                    type: row.querySelector('.app-type').value,
+                    qty: parseFloat(row.querySelector('.app-qty').value) || 1,
+                    hrs: parseFloat(row.querySelector('.app-hrs').value) || 0
+                });
+            });
+
+            const payload = {
+                appliances: appliances,
+                person_count: document.getElementById('person_count').value,
+                waste_kg: document.getElementById('waste_kg').value,
+                rate_per_unit: document.getElementById('rate_per_unit').value,
+                actual_bill: document.getElementById('actual_bill').value
+            };
+
+            const res = await fetch('/api/calculate', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(payload)
+            });
+
+            const data = await res.json();
+            
+            // Metrics Cards Update
+            document.getElementById('card-bill').innerText = `₹${data.estimated_bill.toLocaleString()}`;
+            document.getElementById('card-kwh').innerText = `${data.monthly_kwh} kWh / month`;
+            document.getElementById('card-accuracy').innerText = `${data.accuracy_pct}%`;
+            document.getElementById('card-water').innerText = `${data.monthly_water_liters.toLocaleString()} L`;
+            document.getElementById('card-score').innerText = `${data.eco_score} / 100`;
+            document.getElementById('card-co2').innerText = `${data.monthly_co2_kg} kg CO₂ / Month`;
+
+            // Modal Update
+            document.getElementById('modal-energy-score').innerText = `${data.score_breakdown.energy} / 100`;
+            document.getElementById('modal-water-score').innerText = `${data.score_breakdown.water} / 100`;
+            document.getElementById('modal-waste-score').innerText = `${data.score_breakdown.waste} / 100`;
+            document.getElementById('modal-accuracy-score').innerText = `${data.score_breakdown.accuracy} / 100`;
+
+            // Update Donut Chart
+            updatePieChart(data.appliance_breakdown);
+
+            // Render Recommendations
+            renderRecommendations(data.suggestions);
+
+            // Render Top 3 What-If Simulator
+            top3AppliancesData = data.top_3_appliances;
+            renderTop3SimulatorControls(data.top_3_appliances);
+
+            // Refresh History Table & Line Chart
+            fetchHistory();
+
+            // Auto switch to Analytics Tab
+            switchTab('tab-analytics');
+        }
+
+        function updatePieChart(breakdown) {
+            pieChart.data.labels = Object.keys(breakdown);
+            pieChart.data.datasets[0].data = Object.values(breakdown);
+            pieChart.update();
+        }
+
+        function renderRecommendations(suggestions) {
+            const container = document.getElementById('recommendations-container');
+            if (!suggestions || suggestions.length === 0) {
+                container.innerHTML = `<p class="text-sm text-slate-500 italic">No high-impact alerts identified.</p>`;
+                return;
+            }
+
+            container.innerHTML = suggestions.map(item => `
+                <div class="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
+                    <div class="flex justify-between items-center">
+                        <span class="text-xs px-2.5 py-0.5 rounded-full font-bold border ${item.badge_color}">${item.badge}</span>
+                        <span class="text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-md">${item.monthly_savings}</span>
+                    </div>
+                    <h4 class="text-sm font-bold text-slate-800">${item.title}</h4>
+                    <p class="text-xs text-slate-600 leading-relaxed">${item.desc.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')}</p>
+                </div>
+            `).join('');
+        }
+
+        function renderTop3SimulatorControls(top3Apps) {
+            const container = document.getElementById('simulator-controls');
+            if (!top3Apps || top3Apps.length === 0) {
+                container.innerHTML = `<p class="text-sm text-slate-400 italic">No appliances detected for simulation.</p>`;
+                return;
+            }
+
+            container.innerHTML = top3Apps.map((app, index) => `
+                <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 space-y-2">
+                    <div class="flex justify-between text-xs">
+                        <span class="font-bold text-emerald-300 text-sm">${index + 1}. ${app.name} (${app.qty}x)</span>
+                        <span class="text-slate-300 font-semibold" id="sim-val-${index}">${app.hrs} hrs/day</span>
+                    </div>
+                    <input type="range" min="0" max="24" value="${app.hrs}" step="0.5" 
+                           class="w-full accent-emerald-500 cursor-pointer" 
+                           oninput="updateSimVal(${index}, this.value)" onchange="runTop3Simulation()">
+                    <div class="flex justify-between text-[10px] text-slate-400">
+                        <span>0 hrs</span>
+                        <span>Baseline: ${app.hrs} hrs/day</span>
+                        <span>24 hrs</span>
+                    </div>
+                </div>
+            `).join('');
+
+            document.getElementById('simulator-results').classList.remove('hidden');
+            runTop3Simulation();
+        }
+
+        function updateSimVal(index, val) {
+            document.getElementById(`sim-val-${index}`).innerText = `${val} hrs/day`;
+        }
+
+        async function runTop3Simulation() {
+            const sliderElements = document.querySelectorAll('#simulator-controls input[type="range"]');
+            const simAppliances = top3AppliancesData.map((app, idx) => ({
+                wattage: app.wattage,
+                qty: app.qty,
+                orig_hrs: app.hrs,
+                sim_hrs: parseFloat(sliderElements[idx].value)
+            }));
+
+            const res = await fetch('/api/simulate', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    appliances: simAppliances,
+                    rate_per_unit: document.getElementById('rate_per_unit').value
+                })
+            });
+
+            const simRes = await res.json();
+            document.getElementById('sim-kwh-saved').innerText = `${simRes.kwh_saved} kWh`;
+            document.getElementById('sim-cost-saved').innerText = `₹${simRes.cost_saved.toLocaleString()}`;
+            document.getElementById('sim-co2-saved').innerText = `${simRes.co2_reduced} kg`;
+        }
+
+        async function fetchHistory() {
+            const res = await fetch('/api/history');
+            historyGlobal = await res.json();
+
+            // Render Table
+            const tbody = document.getElementById('history-table-body');
+            tbody.innerHTML = historyGlobal.map(item => `
+                <tr class="hover:bg-slate-50 transition">
+                    <td class="p-2 font-medium">${item.timestamp}</td>
+                    <td class="p-2 font-bold">${item.monthly_kwh}</td>
+                    <td class="p-2 text-emerald-700 font-bold">₹${item.estimated_bill}</td>
+                    <td class="p-2">${item.accuracy_pct}%</td>
+                    <td class="p-2">${item.monthly_water_liters}</td>
+                    <td class="p-2">${item.monthly_co2_kg}</td>
+                    <td class="p-2 font-bold text-emerald-600">${item.eco_score}/100</td>
+                    <td class="p-2 text-right">
+                        <button onclick="deleteLogRecord(${item.id})" class="text-rose-500 hover:text-rose-700 font-bold">Delete</button>
+                    </td>
+                </tr>
+            `).join('');
+
+            // Update Line Chart
+            if (historyGlobal.length > 0) {
+                lineChart.data.labels = historyGlobal.map(item => item.timestamp);
+                lineChart.data.datasets[0].data = historyGlobal.map(item => item.monthly_kwh);
+                lineChart.data.datasets[1].data = historyGlobal.map(item => item.estimated_bill);
+                lineChart.update();
+            }
+        }
+
+        async function deleteLogRecord(id) {
+            if (!confirm("Are you sure you want to delete this historical record?")) return;
+            await fetch(`/api/history/delete/${id}`, { method: 'DELETE' });
+            fetchHistory();
+        }
+
+        function exportHistoryCSV() {
+            if (!historyGlobal || historyGlobal.length === 0) return alert("No history available.");
+            let csv = "Timestamp,Monthly_kWh,Est_Bill,Accuracy,Water_L,CO2_kg,Eco_Score\n";
+            historyGlobal.forEach(h => {
+                csv += `"${h.timestamp}",${h.monthly_kwh},${h.estimated_bill},${h.accuracy_pct},${h.monthly_water_liters},${h.monthly_co2_kg},${h.eco_score}\n`;
+            });
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `sustainability_history_${Date.now()}.csv`;
+            link.click();
+        }
+
+        function initCharts() {
+            const ctxPie = document.getElementById('pieChart').getContext('2d');
+            pieChart = new Chart(ctxPie, {
+                type: 'doughnut',
+                data: { labels: [], datasets: [{ data: [], backgroundColor: ['#10b981', '#3b82f6', '#f59e0b', '#8b5cf6', '#ec4899', '#64748b'] }] },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+
+            const ctxLine = document.getElementById('lineChart').getContext('2d');
+            lineChart = new Chart(ctxLine, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [
+                        { label: 'Monthly kWh', data: [], borderColor: '#10b981', tension: 0.3 },
+                        { label: 'Est. Bill (₹)', data: [], borderColor: '#3b82f6', tension: 0.3 }
+                    ]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+        }
+
+        function toggleScoreModal() {
+            document.getElementById('scoreModal').classList.toggle('hidden');
+        }
+    </script>
+</body>
+</html>
