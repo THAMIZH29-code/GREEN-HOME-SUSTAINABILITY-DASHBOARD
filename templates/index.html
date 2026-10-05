@@ -253,7 +253,7 @@
             <div class="flex justify-between items-center border-b border-slate-800 pb-3">
                 <div>
                     <h2 class="text-lg font-bold text-emerald-400 flex items-center gap-2"><i class="fa-solid fa-sliders"></i> Top-3 High-Impact Load Simulator</h2>
-                    <p class="text-xs text-slate-300 mt-1">Focus exclusively on your highest energy consumers for maximum cost savings.</p>
+                    <p class="text-xs text-slate-300 mt-1">Adjust the usage of your highest energy-consuming appliances and compare the possible savings.</p>
                 </div>
                 <span class="text-xs bg-slate-800 text-emerald-300 border border-slate-700 px-3 py-1 rounded-md">Focused What-If Engine</span>
             </div>
@@ -262,18 +262,44 @@
                 <p class="text-sm text-slate-400 italic">Please run the calculator in Tab 1 to populate your top 3 appliances.</p>
             </div>
 
-            <div id="simulator-results" class="hidden bg-slate-800 p-5 rounded-xl border border-slate-700 grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
-                <div class="p-3 bg-slate-900/50 rounded-lg">
-                    <span class="text-xs text-slate-400 uppercase font-semibold">Monthly Energy Saved</span>
-                    <p class="text-2xl font-bold text-emerald-400 mt-1" id="sim-kwh-saved">0 kWh</p>
+            <div id="simulator-results" class="hidden bg-slate-800 p-5 rounded-xl border border-slate-700 space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
+                    <div class="p-3 bg-slate-900/50 rounded-lg">
+                        <span class="text-xs text-slate-400 uppercase font-semibold">Monthly Energy Saved</span>
+                        <p class="text-2xl font-bold text-emerald-400 mt-1" id="sim-kwh-saved">0 kWh</p>
+                    </div>
+                    <div class="p-3 bg-slate-900/50 rounded-lg">
+                        <span class="text-xs text-slate-400 uppercase font-semibold">Monthly Cost Savings</span>
+                        <p class="text-2xl font-bold text-emerald-400 mt-1" id="sim-cost-saved">₹0.00</p>
+                    </div>
+                    <div class="p-3 bg-slate-900/50 rounded-lg">
+                        <span class="text-xs text-slate-400 uppercase font-semibold">CO₂ Avoided</span>
+                        <p class="text-2xl font-bold text-emerald-400 mt-1" id="sim-co2-saved">0 kg</p>
+                    </div>
                 </div>
-                <div class="p-3 bg-slate-900/50 rounded-lg">
-                    <span class="text-xs text-slate-400 uppercase font-semibold">Monthly Cost Savings</span>
-                    <p class="text-2xl font-bold text-emerald-400 mt-1" id="sim-cost-saved">₹0.00</p>
-                </div>
-                <div class="p-3 bg-slate-900/50 rounded-lg">
-                    <span class="text-xs text-slate-400 uppercase font-semibold">CO₂ Avoided</span>
-                    <p class="text-2xl font-bold text-emerald-400 mt-1" id="sim-co2-saved">0 kg</p>
+
+                <div class="bg-slate-900/60 border border-emerald-800 rounded-xl p-4">
+                    <div class="flex justify-between items-center mb-3">
+                        <div>
+                            <h3 class="text-sm font-bold text-emerald-300">Sustainability Score Improvement</h3>
+                            <p class="text-[11px] text-slate-400 mt-1">Calculated after the selected appliance usage is reduced.</p>
+                        </div>
+                        <i class="fa-solid fa-arrow-trend-up text-emerald-400"></i>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-center">
+                        <div class="bg-slate-800 rounded-lg p-3">
+                            <p class="text-[10px] uppercase text-slate-400 font-semibold">Current Score</p>
+                            <p id="sim-original-score" class="text-xl font-bold text-white mt-1">0 / 100</p>
+                        </div>
+                        <div class="bg-slate-800 rounded-lg p-3">
+                            <p class="text-[10px] uppercase text-slate-400 font-semibold">What-If Score</p>
+                            <p id="sim-new-score" class="text-xl font-bold text-emerald-400 mt-1">0 / 100</p>
+                        </div>
+                        <div class="bg-slate-800 rounded-lg p-3">
+                            <p class="text-[10px] uppercase text-slate-400 font-semibold">Improvement</p>
+                            <p id="sim-score-change" class="text-xl font-bold text-emerald-400 mt-1">+0</p>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -354,11 +380,19 @@
         let pieChart, lineChart;
         let top3AppliancesData = [];
         let historyGlobal = [];
+        let lastCalculationData = {};
 
         window.addEventListener('DOMContentLoaded', async () => {
-            const res = await fetch('/api/appliances');
-            applianceList = await res.json();
-            
+            try {
+                const res = await fetch('/api/appliances');
+                if (!res.ok) throw new Error('Appliance API failed');
+                applianceList = await res.json();
+            } catch (error) {
+                console.error(error);
+                alert('Could not load the appliance list. Make sure app.py is running.');
+                return;
+            }
+
             load2BHKPreset();
             updateTariffPreview();
             initCharts();
@@ -441,47 +475,208 @@
             addApplianceRow("Television (43-inch LED - 75W)", 1, 4);
         }
 
-        function addApplianceRow(defaultType = "", defaultQty = 1, defaultHrs = 5) {
+        function updateApplianceCount() {
+            const count = document.querySelectorAll('#appliance-list > div').length;
+            const counter = document.getElementById('appliance-count');
+            const button = document.getElementById('add-appliance-btn');
+            if (counter) counter.innerText = `${count} / 20 appliances`;
+            if (button) {
+                button.disabled = count >= 20;
+                button.classList.toggle('opacity-50', count >= 20);
+                button.classList.toggle('cursor-not-allowed', count >= 20);
+            }
+        }
+
+        function addApplianceRow(defaultType = '', defaultQty = 1, defaultHrs = 5, defaultCustomName = '', defaultCustomWattage = '') {
             const container = document.getElementById('appliance-list');
-            const rowId = Date.now() + Math.random();
-            
+            const currentRows = container.querySelectorAll(':scope > div').length;
+
+            if (currentRows >= 20) {
+                alert('Maximum 20 appliances can be added.');
+                return;
+            }
+
+            const rowId = `row-${Date.now()}-${Math.floor(Math.random() * 100000)}`;
             let optionsHtml = '';
-            for (let name in applianceList) {
+
+            for (const name in applianceList) {
                 const selected = name === defaultType ? 'selected' : '';
                 optionsHtml += `<option value="${name}" ${selected}>${name}</option>`;
             }
 
+            const customVisible = defaultType === 'Custom Appliance';
+
             const rowHtml = `
-                <div class="flex items-center gap-2 border-b border-slate-100 pb-2" id="row-${rowId}">
-                    <select class="flex-1 p-2 text-xs border rounded-lg outline-none focus:ring-1 focus:ring-emerald-500 app-type">
-                        ${optionsHtml}
-                    </select>
-                    <input type="number" min="1" value="${defaultQty}" class="w-16 p-2 text-xs border rounded-lg app-qty" placeholder="Qty">
-                    <input type="number" min="0" max="24" step="0.5" value="${defaultHrs}" class="w-20 p-2 text-xs border rounded-lg app-hrs" placeholder="Hrs/Day">
-                    <button onclick="removeRow('row-${rowId}')" class="text-rose-500 hover:text-rose-700 p-1"><i class="fa-solid fa-trash"></i></button>
-                </div>
-            `;
+                <div class="border-b border-slate-100 pb-3 space-y-2" id="${rowId}">
+                    <div class="flex items-center gap-2">
+                        <select class="flex-1 p-2 text-xs border rounded-lg outline-none focus:ring-1 focus:ring-emerald-500 app-type" onchange="toggleCustomAppliance('${rowId}')">
+                            ${optionsHtml}
+                        </select>
+                        <input type="number" min="1" step="1" value="${defaultQty}" class="w-16 p-2 text-xs border rounded-lg app-qty" placeholder="Qty" title="Quantity">
+                        <input type="number" min="0" max="24" step="0.5" value="${defaultHrs}" class="w-20 p-2 text-xs border rounded-lg app-hrs" placeholder="Hrs/Day" title="Hours per day">
+                        <button type="button" onclick="removeRow('${rowId}')" class="text-rose-500 hover:text-rose-700 p-1" title="Remove appliance"><i class="fa-solid fa-trash"></i></button>
+                    </div>
+
+                    <div class="custom-appliance-fields ${customVisible ? '' : 'hidden'} bg-amber-50 border border-amber-200 rounded-lg p-3">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                            <input type="text" value="${defaultCustomName}" class="p-2 text-xs border rounded-lg outline-none focus:ring-1 focus:ring-emerald-500 app-custom-name" placeholder="Enter appliance name">
+                            <input type="number" min="0" step="1" value="${defaultCustomWattage}" class="p-2 text-xs border rounded-lg outline-none focus:ring-1 focus:ring-emerald-500 app-custom-wattage" placeholder="Enter power in watts">
+                        </div>
+                        <p class="text-[10px] text-slate-500 mt-2">Enter name → power → quantity → hours/day. Press Enter to move to the next field.</p>
+                        <div class="mt-2 flex items-center gap-2">
+                            <button type="button" onclick="confirmCustomAppliance('${rowId}')" class="text-xs bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-lg font-semibold">
+                                <i class="fa-solid fa-check"></i> Add Custom Appliance
+                            </button>
+                            <span class="custom-status text-[10px] text-emerald-700 font-semibold hidden"><i class="fa-solid fa-circle-check"></i> Custom appliance added</span>
+                        </div>
+                    </div>
+                </div>`;
+
             container.insertAdjacentHTML('beforeend', rowHtml);
+            const row = document.getElementById(rowId);
+            setupCustomEnterNavigation(row);
+            toggleCustomAppliance(rowId, false);
+            updateApplianceCount();
+        }
+
+        function toggleCustomAppliance(rowId, focusName = true) {
+            const row = document.getElementById(rowId);
+            if (!row) return;
+
+            const type = row.querySelector('.app-type').value;
+            const fields = row.querySelector('.custom-appliance-fields');
+            const status = row.querySelector('.custom-status');
+
+            if (type === 'Custom Appliance') {
+                fields.classList.remove('hidden');
+                if (focusName) {
+                    setTimeout(() => row.querySelector('.app-custom-name')?.focus(), 50);
+                }
+            } else {
+                fields.classList.add('hidden');
+                row.querySelector('.app-custom-name').value = '';
+                row.querySelector('.app-custom-wattage').value = '';
+                status?.classList.add('hidden');
+            }
+        }
+
+        function confirmCustomAppliance(rowId) {
+            const row = document.getElementById(rowId);
+            if (!row) return false;
+
+            const name = row.querySelector('.app-custom-name').value.trim();
+            const wattage = Number(row.querySelector('.app-custom-wattage').value);
+            const qty = Number(row.querySelector('.app-qty').value);
+            const hrs = Number(row.querySelector('.app-hrs').value);
+
+            if (!name) {
+                alert('Please enter the custom appliance name.');
+                row.querySelector('.app-custom-name').focus();
+                return false;
+            }
+            if (!wattage || wattage <= 0) {
+                alert('Please enter a valid power value in watts.');
+                row.querySelector('.app-custom-wattage').focus();
+                return false;
+            }
+            if (!qty || qty <= 0) {
+                alert('Please enter a valid quantity.');
+                row.querySelector('.app-qty').focus();
+                return false;
+            }
+            if (hrs < 0 || hrs > 24) {
+                alert('Hours per day must be between 0 and 24.');
+                row.querySelector('.app-hrs').focus();
+                return false;
+            }
+
+            row.dataset.customReady = 'true';
+            row.querySelector('.custom-status')?.classList.remove('hidden');
+            return true;
+        }
+
+        function setupCustomEnterNavigation(row) {
+            if (!row) return;
+            const nameInput = row.querySelector('.app-custom-name');
+            const wattageInput = row.querySelector('.app-custom-wattage');
+            const qtyInput = row.querySelector('.app-qty');
+            const hrsInput = row.querySelector('.app-hrs');
+
+            nameInput?.addEventListener('keydown', event => {
+                if (event.key === 'Enter') {
+                    event.preventDefault();
+                    wattageInput.focus();
+                }
+            });
+
+            wattageInput?.addEventListener('keydown', event => {
+                if (event.key === 'Enter') {
+                    event.preventDefault();
+                    if (!nameInput.value.trim()) {
+                        alert('Please enter the custom appliance name.');
+                        nameInput.focus();
+                        return;
+                    }
+                    if (!wattageInput.value || Number(wattageInput.value) <= 0) {
+                        alert('Please enter a valid power value in watts.');
+                        wattageInput.focus();
+                        return;
+                    }
+                    qtyInput.focus();
+                }
+            });
+
+            qtyInput?.addEventListener('keydown', event => {
+                if (event.key === 'Enter') {
+                    event.preventDefault();
+                    hrsInput.focus();
+                }
+            });
+
+            hrsInput?.addEventListener('keydown', event => {
+                if (event.key === 'Enter' && row.querySelector('.app-type').value === 'Custom Appliance') {
+                    event.preventDefault();
+                    confirmCustomAppliance(row.id);
+                }
+            });
         }
 
         function removeRow(id) {
             document.getElementById(id)?.remove();
+            updateApplianceCount();
         }
 
         async function calculateDashboard() {
             const rows = document.querySelectorAll('#appliance-list > div');
             const appliances = [];
 
-            rows.forEach(row => {
+            for (const row of rows) {
+                const type = row.querySelector('.app-type').value;
+                const qty = parseFloat(row.querySelector('.app-qty').value) || 1;
+                const hrs = parseFloat(row.querySelector('.app-hrs').value) || 0;
+                const customName = row.querySelector('.app-custom-name')?.value.trim() || '';
+                const customWattage = parseFloat(row.querySelector('.app-custom-wattage')?.value) || 0;
+
+                if (type === 'Custom Appliance') {
+                    if (!confirmCustomAppliance(row.id)) return;
+                }
+
                 appliances.push({
-                    type: row.querySelector('.app-type').value,
-                    qty: parseFloat(row.querySelector('.app-qty').value) || 1,
-                    hrs: parseFloat(row.querySelector('.app-hrs').value) || 0
+                    type,
+                    qty,
+                    hrs,
+                    custom_name: customName,
+                    custom_wattage: customWattage
                 });
-            });
+            }
+
+            if (appliances.length === 0) {
+                alert('Please add at least one appliance before running the calculation.');
+                return;
+            }
 
             const payload = {
-                appliances: appliances,
+                appliances,
                 person_count: document.getElementById('person_count').value,
                 waste_kg: document.getElementById('waste_kg').value,
                 provider: document.getElementById('provider').value,
@@ -492,28 +687,36 @@
             let res;
             try {
                 res = await fetch('/api/calculate', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify(payload)
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(payload)
                 });
             } catch (error) {
-                console.error(error);
-                alert('Could not connect to the Flask server. Make sure app.py is running.');
+                console.error('Flask connection error:', error);
+                alert('Flask server is not reachable. Start app.py first, then open http://127.0.0.1:5000');
                 return;
             }
 
-            const data = await res.json();
+            let data;
+            try {
+                data = await res.json();
+            } catch (error) {
+                alert('Flask returned an invalid response. Check the terminal where app.py is running.');
+                return;
+            }
 
             if (!res.ok) {
-                alert(data.error || 'Calculation failed.');
+                console.error(data);
+                alert(data.error || 'Calculation failed on the Flask server.');
                 return;
             }
-            
-            // Metrics Cards Update
-            document.getElementById('card-bill').innerText = `₹${data.estimated_bill.toLocaleString()}`;
+
+            lastCalculationData = data;
+
+            document.getElementById('card-bill').innerText = `₹${Number(data.estimated_bill).toLocaleString()}`;
             document.getElementById('card-kwh').innerText = `${data.monthly_kwh} kWh / month`;
             document.getElementById('card-accuracy').innerText = `${data.accuracy_pct}%`;
-            document.getElementById('card-water').innerText = `${data.monthly_water_liters.toLocaleString()} L`;
+            document.getElementById('card-water').innerText = `${Number(data.monthly_water_liters).toLocaleString()} L`;
             document.getElementById('card-score').innerText = `${data.eco_score} / 100`;
             document.getElementById('card-co2').innerText = `${data.monthly_co2_kg} kg CO₂ / Month`;
 
@@ -527,27 +730,22 @@
             }
 
             renderTariffBreakdown(data.tariff_breakdown);
-
-            // Modal Update
             document.getElementById('modal-energy-score').innerText = `${data.score_breakdown.energy} / 100`;
             document.getElementById('modal-water-score').innerText = `${data.score_breakdown.water} / 100`;
             document.getElementById('modal-waste-score').innerText = `${data.score_breakdown.waste} / 100`;
             document.getElementById('modal-accuracy-score').innerText = `${data.score_breakdown.accuracy} / 100`;
 
-            // Update Donut Chart
             updatePieChart(data.appliance_breakdown);
-
-            // Render Recommendations
             renderRecommendations(data.suggestions);
+            top3AppliancesData = data.top_3_appliances || [];
+            renderTop3SimulatorControls(top3AppliancesData);
 
-            // Render Top 3 What-If Simulator
-            top3AppliancesData = data.top_3_appliances;
-            renderTop3SimulatorControls(data.top_3_appliances);
+            try {
+                await fetchHistory();
+            } catch (error) {
+                console.error('History refresh error:', error);
+            }
 
-            // Refresh History Table & Line Chart
-            fetchHistory();
-
-            // Auto switch to Analytics Tab
             switchTab('tab-analytics');
         }
 
@@ -591,7 +789,7 @@
                     </div>
                     <input type="range" min="0" max="24" value="${app.hrs}" step="0.5" 
                            class="w-full accent-emerald-500 cursor-pointer" 
-                           oninput="updateSimVal(${index}, this.value)" onchange="runTop3Simulation()">
+                           oninput="updateSimVal(${index}, this.value); runTop3Simulation()">
                     <div class="flex justify-between text-[10px] text-slate-400">
                         <span>0 hrs</span>
                         <span>Baseline: ${app.hrs} hrs/day</span>
@@ -610,26 +808,53 @@
 
         async function runTop3Simulation() {
             const sliderElements = document.querySelectorAll('#simulator-controls input[type="range"]');
+            if (!top3AppliancesData.length || !sliderElements.length || !lastCalculationData.monthly_kwh) return;
+
             const simAppliances = top3AppliancesData.map((app, idx) => ({
-                wattage: app.wattage,
-                qty: app.qty,
-                orig_hrs: app.hrs,
-                sim_hrs: parseFloat(sliderElements[idx].value)
+                wattage: Number(app.wattage) || 0,
+                qty: Number(app.qty) || 1,
+                orig_hrs: Number(app.hrs) || 0,
+                sim_hrs: parseFloat(sliderElements[idx].value) || 0
             }));
 
-            const res = await fetch('/api/simulate', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({
-                    appliances: simAppliances,
-                    provider: document.getElementById('provider').value
-                })
-            });
+            const payload = {
+                appliances: simAppliances,
+                provider: document.getElementById('provider').value,
+                person_count: parseInt(document.getElementById('person_count').value) || 1,
+                baseline_monthly_kwh: Number(lastCalculationData.monthly_kwh) || 0,
+                baseline_score: Number(lastCalculationData.eco_score) || 0,
+                water_score: Number(lastCalculationData.score_breakdown?.water) || 0,
+                waste_score: Number(lastCalculationData.score_breakdown?.waste) || 0,
+                accuracy_pct: Number(lastCalculationData.accuracy_pct) || 0
+            };
 
-            const simRes = await res.json();
-            document.getElementById('sim-kwh-saved').innerText = `${simRes.kwh_saved} kWh`;
-            document.getElementById('sim-cost-saved').innerText = `₹${simRes.cost_saved.toLocaleString()}`;
-            document.getElementById('sim-co2-saved').innerText = `${simRes.co2_reduced} kg`;
+            try {
+                const res = await fetch('/api/simulate', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(payload)
+                });
+
+                const simRes = await res.json();
+                if (!res.ok) {
+                    console.error(simRes.error || 'Simulation failed');
+                    return;
+                }
+
+                document.getElementById('sim-kwh-saved').innerText = `${simRes.kwh_saved} kWh`;
+                document.getElementById('sim-cost-saved').innerText = `₹${Number(simRes.cost_saved).toLocaleString()}`;
+                document.getElementById('sim-co2-saved').innerText = `${simRes.co2_reduced} kg`;
+                document.getElementById('sim-original-score').innerText = `${simRes.original_sustainability_score} / 100`;
+                document.getElementById('sim-new-score').innerText = `${simRes.simulated_sustainability_score} / 100`;
+
+                const change = Number(simRes.sustainability_score_change);
+                const changeEl = document.getElementById('sim-score-change');
+                changeEl.innerText = `${change >= 0 ? '+' : ''}${change}`;
+                changeEl.classList.toggle('text-emerald-400', change >= 0);
+                changeEl.classList.toggle('text-rose-400', change < 0);
+            } catch (error) {
+                console.error('Simulation error:', error);
+            }
         }
 
         async function fetchHistory() {
