@@ -16,18 +16,40 @@ db.init_app(app)
 APPLIANCE_DATA = {
     "Air Conditioner 1.5 Ton (Inverter - 1500W)": 1500,
     "Air Conditioner 1.5 Ton (Non-Inverter - 1800W)": 1800,
-    "Water Heater / Geyser (2000W)": 2000,
-    "Water Pump / Submersible (750W)": 750,
-    "Washing Machine (650W)": 650,
-    "Microwave Oven (1200W)": 1200,
     "Refrigerator (Double Door - 250W)": 250,
     "Refrigerator (Single Door - 100W)": 100,
-    "Ceiling Fan (Standard - 75W)": 75,
+    "Washing Machine (650W)": 650,
+    "Water Heater / Geyser (2000W)": 2000,
+    "Water Pump / Submersible (750W)": 750,
     "Television (43-inch LED - 75W)": 75,
+    "Set-Top Box (15W)": 15,
+    "Ceiling Fan (Standard - 75W)": 75,
+    "Adjustable / Pedestal Fan (75W)": 75,
+    "Table Fan (55W)": 55,
+    "Exhaust Fan (40W)": 40,
+    "LED Bulb (9W)": 9,
+    "LED Bulb (5W)": 5,
+    "Small Bulb (7W)": 7,
+    "Tube Light (20W)": 20,
+    "Night / Tiny LED Bulb (1W)": 1,
+    "LED Strip Light (20W)": 20,
     "Desktop Computer (200W)": 200,
     "Laptop (65W)": 65,
-    "Tube Light (20W)": 20,
-    "LED Bulb (9W)": 9,
+    "Laptop Charger (90W)": 90,
+    "Mobile Charger (10W)": 10,
+    "Wi-Fi Router (12W)": 12,
+    "Microwave Oven (1200W)": 1200,
+    "OTG / Electric Oven (1500W)": 1500,
+    "Electric Mixer Grinder (500W)": 500,
+    "Mixer / Mixie (500W)": 500,
+    "Induction Cooktop (1800W)": 1800,
+    "Electric Kettle (1500W)": 1500,
+    "Iron Box (1000W)": 1000,
+    "Water Purifier / RO (50W)": 50,
+    "Hair Dryer (1200W)": 1200,
+    "Room Heater (2000W)": 2000,
+    "Air Cooler (200W)": 200,
+    "Vacuum Cleaner (1000W)": 1000,
     "Custom Appliance": 0
 }
 
@@ -225,8 +247,13 @@ def calculate():
             qty = max(0.0, safe_float(app_item.get('qty', 1), 1.0))
             hrs = max(0.0, safe_float(app_item.get('hrs', 0), 0.0))
 
-            wattage = APPLIANCE_DATA.get(app_type, 0)
-            label_name = app_type.split(' (')[0] if '(' in app_type else app_type
+            if app_type == "Custom Appliance":
+                custom_name = str(app_item.get('custom_name', '')).strip() or "Custom Appliance"
+                wattage = max(0.0, safe_float(app_item.get('custom_wattage', 0), 0.0))
+                label_name = custom_name
+            else:
+                wattage = APPLIANCE_DATA.get(app_type, 0)
+                label_name = app_type.split(' (')[0] if '(' in app_type else app_type
 
             daily_kwh_item = (wattage * qty * hrs) / 1000.0
             total_daily_kwh += daily_kwh_item
@@ -391,36 +418,89 @@ def simulate():
         appliances = data.get('appliances', [])
         provider = data.get('provider', 'MSEDCL') if data.get('provider', 'MSEDCL') in TARIFFS else 'MSEDCL'
 
-        orig_daily_kwh = 0.0
-        sim_daily_kwh = 0.0
+        person_count = max(1, safe_int(data.get('person_count', 4), 4))
+        water_score = max(0.0, min(100.0, safe_float(data.get('water_score', 90), 90.0)))
+        waste_score = max(0.0, min(100.0, safe_float(data.get('waste_score', 100), 100.0)))
+        accuracy_pct = max(0.0, min(100.0, safe_float(data.get('accuracy_pct', 100), 100.0)))
+        baseline_monthly_kwh = max(0.0, safe_float(data.get('baseline_monthly_kwh', 0), 0.0))
+        baseline_score = max(10, min(100, safe_int(data.get('baseline_score', 0), 0)))
+
+        original_selected_daily_kwh = 0.0
+        simulated_selected_daily_kwh = 0.0
 
         for app_item in appliances:
-            wattage = safe_float(app_item.get('wattage', 0))
-            qty = safe_float(app_item.get('qty', 1), 1.0)
-            orig_hrs = safe_float(app_item.get('orig_hrs', 0))
-            sim_hrs = safe_float(app_item.get('sim_hrs', 0))
+            wattage = max(0.0, safe_float(app_item.get('wattage', 0), 0.0))
+            qty = max(0.0, safe_float(app_item.get('qty', 1), 1.0))
+            orig_hrs = max(0.0, safe_float(app_item.get('orig_hrs', 0), 0.0))
+            sim_hrs = max(0.0, safe_float(app_item.get('sim_hrs', 0), 0.0))
 
-            orig_daily_kwh += (wattage * qty * orig_hrs) / 1000.0
-            sim_daily_kwh += (wattage * qty * sim_hrs) / 1000.0
+            original_selected_daily_kwh += (wattage * qty * orig_hrs) / 1000.0
+            simulated_selected_daily_kwh += (wattage * qty * sim_hrs) / 1000.0
 
-        orig_monthly_kwh = round(orig_daily_kwh * 30, 2)
-        sim_monthly_kwh = round(sim_daily_kwh * 30, 2)
+        original_selected_monthly_kwh = round(original_selected_daily_kwh * 30, 2)
+        simulated_selected_monthly_kwh = round(simulated_selected_daily_kwh * 30, 2)
 
-        orig_bill = calculate_bill(orig_monthly_kwh, provider)["total"]
-        sim_bill = calculate_bill(sim_monthly_kwh, provider)["total"]
+        # The full household baseline comes from the main calculation.
+        original_monthly_kwh = baseline_monthly_kwh if baseline_monthly_kwh > 0 else original_selected_monthly_kwh
 
-        kwh_saved = round(orig_monthly_kwh - sim_monthly_kwh, 2)
-        cost_saved = round(orig_bill - sim_bill, 2)
+        selected_kwh_change = round(
+            original_selected_monthly_kwh - simulated_selected_monthly_kwh, 2
+        )
+
+        simulated_monthly_kwh = round(
+            max(0.0, original_monthly_kwh - selected_kwh_change), 2
+        )
+
+        kwh_saved = round(original_monthly_kwh - simulated_monthly_kwh, 2)
+
+        original_bill = calculate_bill(original_monthly_kwh, provider)['total']
+        simulated_bill = calculate_bill(simulated_monthly_kwh, provider)['total']
+
+        cost_saved = round(original_bill - simulated_bill, 2)
         co2_reduced = round(kwh_saved * 0.82, 2)
 
+        original_energy_score = 100 if (original_monthly_kwh / person_count) <= 60 else (80 if (original_monthly_kwh / person_count) <= 120 else (60 if (original_monthly_kwh / person_count) <= 180 else 40))
+        simulated_energy_score = 100 if (simulated_monthly_kwh / person_count) <= 60 else (80 if (simulated_monthly_kwh / person_count) <= 120 else (60 if (simulated_monthly_kwh / person_count) <= 180 else 40))
+
+        calculated_original_score = int(
+            (original_energy_score * 0.40)
+            + (water_score * 0.25)
+            + (waste_score * 0.20)
+            + (accuracy_pct * 0.15)
+        )
+        calculated_original_score = max(10, min(100, calculated_original_score))
+
+        original_sustainability_score = baseline_score if baseline_score else calculated_original_score
+
+        # A what-if change affects electricity use only. Water, waste and
+        # Model Accuracy remain unchanged because their inputs were not changed.
+        simulated_sustainability_score = int(
+            (simulated_energy_score * 0.40)
+            + (water_score * 0.25)
+            + (waste_score * 0.20)
+            + (accuracy_pct * 0.15)
+        )
+        simulated_sustainability_score = max(10, min(100, simulated_sustainability_score))
+
+        score_change = simulated_sustainability_score - original_sustainability_score
+
         return jsonify({
-            "kwh_saved": kwh_saved,
-            "cost_saved": cost_saved,
-            "co2_reduced": co2_reduced
+            'kwh_saved': kwh_saved,
+            'cost_saved': cost_saved,
+            'co2_reduced': co2_reduced,
+            'original_monthly_kwh': original_monthly_kwh,
+            'simulated_monthly_kwh': simulated_monthly_kwh,
+            'original_bill': round(original_bill, 2),
+            'simulated_bill': round(simulated_bill, 2),
+            'original_energy_score': original_energy_score,
+            'simulated_energy_score': simulated_energy_score,
+            'original_sustainability_score': original_sustainability_score,
+            'simulated_sustainability_score': simulated_sustainability_score,
+            'sustainability_score_change': score_change
         }), 200
 
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/history', methods=['GET'])
 def get_history():
